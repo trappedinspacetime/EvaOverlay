@@ -60,7 +60,7 @@ public class PointerService extends AccessibilityService {
     }
 
     private void cleanup() {
-        alive = false
+        alive = false;
         if (sock != null) sock.close();
         if (view != null && wm != null) {
             try { wm.removeView(view); } catch (Exception ignored) { }
