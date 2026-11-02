@@ -13,7 +13,7 @@ public class PointerService extends AccessibilityService {
     private WindowManager wm;
     private OverlayService.PointerView view;
     private DatagramSocket sock;
-
+    private volatile boolean alive = true;
     @Override public void onAccessibilityEvent(AccessibilityEvent e) { }
     @Override public void onInterrupt() { }
 
@@ -40,22 +40,27 @@ public class PointerService extends AccessibilityService {
     }
 
     private void listen() {
-        try {
-            sock = new DatagramSocket(OverlayService.PORT);
-            byte[] buf = new byte[64];
-            while (!sock.isClosed()) {
-                DatagramPacket p = new DatagramPacket(buf, buf.length);
-                sock.receive(p);
-                String[] a = new String(p.getData(), 0, p.getLength()).trim().split(",");
-                float x = Float.parseFloat(a[0]);
-                float y = Float.parseFloat(a[1]);
-                float pr = a.length > 2 ? Float.parseFloat(a[2]) : 0f;
-                view.update(x, y, pr);
+        while (alive) {
+            try {
+                sock = new DatagramSocket(OverlayService.PORT);
+                byte[] buf = new byte[64];
+                while (alive && !sock.isClosed()) {
+                    DatagramPacket p = new DatagramPacket(buf, buf.length);
+                    sock.receive(p);
+                    String[] a = new String(p.getData(), 0, p.getLength()).trim().split(",");
+                    float x = Float.parseFloat(a[0]);
+                    float y = Float.parseFloat(a[1]);
+                    float pr = a.length > 2 ? Float.parseFloat(a[2]) : 0f;
+                    view.update(x, y, pr);
+                }
+            } catch (Exception e) {
+                try { Thread.sleep(1000); } catch (InterruptedException ignored) { }
             }
-        } catch (Exception ignored) { }
+        }
     }
 
     private void cleanup() {
+        alive = false
         if (sock != null) sock.close();
         if (view != null && wm != null) {
             try { wm.removeView(view); } catch (Exception ignored) { }

@@ -31,6 +31,21 @@ public class MainActivity extends Activity {
         stop.setOnClickListener(v -> stopService(new Intent(this, OverlayService.class)));
 
         l.addView(start);
+        Button camOn = new Button(this);
+        camOn.setText("Kamera başlat");
+        camOn.setOnClickListener(v -> {
+            if (checkSelfPermission(android.Manifest.permission.CAMERA)
+                    != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{android.Manifest.permission.CAMERA}, 1);
+            } else {
+                startForegroundService(new Intent(this, CameraService.class));
+            }
+        });
+        Button camOff = new Button(this);
+        camOff.setText("Kamera durdur");
+        camOff.setOnClickListener(v -> stopService(new Intent(this, CameraService.class)));
+        l.addView(camOn);
+        l.addView(camOff);
         l.addView(stop);
         setContentView(l);
     }
