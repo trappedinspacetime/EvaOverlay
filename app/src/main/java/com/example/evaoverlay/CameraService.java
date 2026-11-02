@@ -48,6 +48,7 @@ public class CameraService extends Service {
     }
 
     private void openCamera() {
+        if (reader != null) { reader.close(); reader = null; }
         try {
             CameraManager cm = (CameraManager) getSystemService(CAMERA_SERVICE);
             String id = null;
@@ -95,11 +96,13 @@ public class CameraService extends Service {
                                 }, h);
                     } catch (Exception ignored) { }
                 }
-                @Override public void onDisconnected(CameraDevice d) { d.close(); }
-                @Override public void onError(CameraDevice d, int e) { d.close(); }
+                @Override public void onDisconnected(CameraDevice d) { d.close(); cam = null; retry(); }
+                @Override public void onError(CameraDevice d, int e) { d.close(); cam = null; retry(); }
             }, h);
-        } catch (SecurityException | CameraAccessException e) {
+        } catch (SecurityException e) {
             stopSelf();
+        } catch (CameraAccessException e) {
+            retry();
         }
     }
 
@@ -160,7 +163,10 @@ public class CameraService extends Service {
             }
         } catch (Exception ignored) { }
     }
-
+    private void retry() {
+        if (!alive) return;
+        new Handler(Looper.getMainLooper()).postDelayed(() -> { if (alive) openCamera(); }, 1500);
+    }
     @Override public void onDestroy() {
         alive = false;
         synchronized (lock) { lock.notifyAll(); }
