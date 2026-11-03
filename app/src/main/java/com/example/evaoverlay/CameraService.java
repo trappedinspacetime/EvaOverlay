@@ -72,12 +72,14 @@ public class CameraService extends Service {
                     ImageFormat.YUV_420_888, 2);
             Handler h = new Handler(ht.getLooper());
             reader.setOnImageAvailableListener(r -> {
-                Image img = r.acquireLatestImage();
-                if (img == null) return;
                 try {
-                    byte[] jpg = toJpeg(img);
-                    synchronized (lock) { latest = jpg; seq++; lock.notifyAll(); }
-                } finally { img.close(); }
+                    Image img = r.acquireLatestImage();
+                    if (img == null) return;
+                    try {
+                        byte[] jpg = toJpeg(img);
+                        synchronized (lock) { latest = jpg; seq++; lock.notifyAll(); }
+                    } finally { img.close(); }
+                } catch (Throwable ignored) { }
             }, h);
 
             cm.openCamera(id, new CameraDevice.StateCallback() {

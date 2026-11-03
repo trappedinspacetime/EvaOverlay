@@ -163,7 +163,10 @@ public class CameraService extends Service {
             }
         } catch (Exception ignored) { }
     }
-
+    private void retry() {
+        if (!alive) return;
+        new Handler(Looper.getMainLooper()).postDelayed(() -> { if (alive) openCamera(); }, 1500);
+    }
     @Override public void onDestroy() {
         alive = false;
         synchronized (lock) { lock.notifyAll(); }
