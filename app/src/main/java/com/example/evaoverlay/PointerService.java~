@@ -7,6 +7,8 @@ import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.PixelFormat;
 import android.graphics.RectF;
+import android.media.AudioAttributes;
+import android.media.SoundPool;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
@@ -19,10 +21,15 @@ import java.net.DatagramSocket;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class PointerService extends AccessibilityService {
+    static final int SOUND_PORT = 5007;
     private WindowManager wm;
     private DotView dot;
     private WindowManager.LayoutParams lp;
     private DatagramSocket sock;
+    private DatagramSocket soundSock;
+    private SoundPool pool;
+    private int clickId;
+    private volatile boolean clickReady = false;
     private volatile boolean alive = true;
     private final Handler ui = new Handler(Looper.getMainLooper());
     private final AtomicBoolean pending = new AtomicBoolean(false);
@@ -49,13 +56,23 @@ public class PointerService extends AccessibilityService {
                 PixelFormat.TRANSLUCENT);
         lp.gravity = Gravity.TOP | Gravity.START;
         lp.x = -size;
-        lp.y = -size;                    // başta ekran dışında
+        lp.y = -size;
         if (Build.VERSION.SDK_INT >= 28) {
             lp.layoutInDisplayCutoutMode =
                     WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
         }
         wm.addView(dot, lp);
+
+        AudioAttributes aa = new AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_ASSISTANCE_ACCESSIBILITY)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build();
+        pool = new SoundPool.Builder().setMaxStreams(2).setAudioAttributes(aa).build();
+        pool.setOnLoadCompleteListener((sp, id, status) -> { if (status == 0) clickReady = true; });
+        clickId = pool.load(this, R.raw.click, 1);
+
         new Thread(this::listen).start();
+        new Thread(this::listenSound).start();
     }
 
     private void listen() {
@@ -84,7 +101,24 @@ public class PointerService extends AccessibilityService {
         }
     }
 
-    // Konum güncellemelerini birleştirir: ana thread'de aynı anda en fazla bir iş bekler.
+    private void listenSound() {
+        while (alive) {
+            try {
+                soundSock = new DatagramSocket(SOUND_PORT);
+                byte[] buf = new byte[16];
+                while (alive && !soundSock.isClosed()) {
+                    DatagramPacket p = new DatagramPacket(buf, buf.length);
+                    soundSock.receive(p);
+                    if (clickReady && pool != null) {
+                        pool.play(clickId, 1f, 1f, 1, 0, 1f);
+                    }
+                }
+            } catch (Exception e) {
+                try { Thread.sleep(1000); } catch (InterruptedException ignored) { }
+            }
+        }
+    }
+
     private void push() {
         if (!pending.compareAndSet(false, true)) return;
         ui.post(() -> {
@@ -100,6 +134,8 @@ public class PointerService extends AccessibilityService {
     private void cleanup() {
         alive = false;
         if (sock != null) sock.close();
+        if (soundSock != null) soundSock.close();
+        if (pool != null) { pool.release(); pool = null; }
         if (dot != null && wm != null) {
             try { wm.removeView(dot); } catch (Exception ignored) { }
             dot = null;

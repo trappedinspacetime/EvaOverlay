@@ -89,13 +89,18 @@ public class PointerService extends AccessibilityService {
                         sock.send(new DatagramPacket(r, r.length, p.getAddress(), p.getPort()));
                         continue;
                     }
-                    String[] a = msg.split(",");
-                    tx = Float.parseFloat(a[0]);
-                    ty = Float.parseFloat(a[1]);
-                    tp = a.length > 2 ? Float.parseFloat(a[2]) : 0f;
+                    try {
+                        String[] a = msg.split(",");
+                        tx = Float.parseFloat(a[0]);
+                        ty = Float.parseFloat(a[1]);
+                        tp = a.length > 2 ? Float.parseFloat(a[2]) : 0f;
+                    } catch (RuntimeException bad) {
+                        continue;
+                    }
                     push();
                 }
             } catch (Exception e) {
+                try { if (sock != null) sock.close(); } catch (Exception ignored) { }
                 try { Thread.sleep(1000); } catch (InterruptedException ignored) { }
             }
         }
